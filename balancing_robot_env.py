@@ -21,7 +21,7 @@ class BalancingRobotEnv(gym.Env):
         self.length = 0.15            
         self.polemass_length = self.masspole * self.length
         self.force_mag = 10.0         
-        self.tau = 0.02               
+        self.tau = 0.02               # Frequency = 1/tau = 50 Hz
         
         # --- Hardware Realism: Motor Delay ---
         self.motor_alpha = 0.3        # Motor responsiveness (1.0 = instant, 0.1 = very sluggish)
