@@ -15,20 +15,20 @@ class BalancingRobotEnv(gym.Env):
         
         # --- Physics parameters ---
         self.gravity = 9.8            
-        self.masscart = 0.5           
-        self.masspole = 0.5           
+        self.masscart = 2.5           
+        self.masspole = 9.5          
         self.total_mass = self.masspole + self.masscart
-        self.length = 0.15            
+        self.length = 0.6            
         self.polemass_length = self.masspole * self.length
-        self.force_mag = 10.0         
-        self.tau = 0.02               
+        self.force_mag = 50.0         
+        self.tau = 0.02               # Frequency = 1/tau = 50 Hz      
         
         # --- Hardware Realism: Motor Delay ---
-        self.motor_alpha = 0.3        # Motor responsiveness (1.0 = instant, 0.1 = very sluggish)
+        self.motor_alpha = 0.8        # Motor responsiveness (1.0 = instant, 0.1 = very sluggish)
         self.current_action = 0.0     # Tracks the actual physical state of the motor
         
-        self.theta_threshold_radians = 20 * 2 * math.pi / 360  
-        self.x_threshold = 2.4        
+        self.theta_threshold_radians = 20 * 2 * math.pi / 360  # ~0.349 radians
+        self.x_threshold = 5.0        
         
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
         
@@ -45,7 +45,23 @@ class BalancingRobotEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.current_action = 0.0     # Reset the motor state
-        self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))
+        
+        # FIX: Decoupled randomization
+        # We randomize each state variable independently to ensure the robot 
+        # is challenged, but never spawns in a mathematically impossible/dead state.
+        
+        x = self.np_random.uniform(low=-1.0, high=1.0)              # Spawn up to 1m off center
+        x_dot = self.np_random.uniform(low=-0.2, high=0.2)          # Slight initial lateral speed
+        
+        # 0.25 rad is ~14.3 degrees. (Threshold is 20 deg). 
+        # This is the physical sweet spot for "extreme but recoverable".
+        theta = self.np_random.uniform(low=-0.25, high=0.25)        
+        
+        # Keep initial fall speed low so extreme angles are actually recoverable 
+        # given the 50N force limit and motor delay.
+        theta_dot = self.np_random.uniform(low=-0.1, high=0.1)      
+        
+        self.state = (x, x_dot, theta, theta_dot)
         return np.array(self.state, dtype=np.float32), {}
 
     def step(self, action):
@@ -102,14 +118,12 @@ class BalancingRobotEnv(gym.Env):
             self.fig = None
             self.ax = None
 
-    # UPDATED: Added ax and title arguments for subplot support
     def render(self, ax=None, title="Balancing Robot"):
         x, x_dot, theta, theta_dot = self.state
         angle_deg = theta * 180 / math.pi
         
         if self.render_mode == "human":
             import matplotlib
-            # Only try to set TkAgg if we aren't already in a rendering loop
             if ax is None and self.fig is None:
                 try:
                     matplotlib.use('TkAgg')
@@ -119,7 +133,6 @@ class BalancingRobotEnv(gym.Env):
             import matplotlib.pyplot as plt
             import matplotlib.patches as patches
 
-            # Use the provided axis (for side-by-side), OR create a new one
             current_ax = ax
             if current_ax is None:
                 if self.fig is None:
@@ -129,19 +142,14 @@ class BalancingRobotEnv(gym.Env):
                     plt.show(block=False) 
                 current_ax = self.ax
             
-            # Clear the previous frame
             current_ax.clear()
-            
-            # Set physical limits for the axes
             current_ax.set_xlim(-self.x_threshold, self.x_threshold)
             current_ax.set_ylim(-0.5, 1.5)
             current_ax.set_aspect('equal')
             current_ax.axis('off')  
             
-            # 1. Draw the Ground
             current_ax.axhline(0, color='black', linewidth=2)
             
-            # 2. Draw the Cart (Chassis)
             cart_width, cart_height = 0.4, 0.2
             cart = patches.Rectangle(
                 (x - cart_width/2, -cart_height/2), 
@@ -152,18 +160,15 @@ class BalancingRobotEnv(gym.Env):
             )
             current_ax.add_patch(cart)
             
-            # 3. Draw the Pole (Robot Body)
             pole_length = 0.8
             pole_end_x = x + pole_length * math.sin(theta)
             pole_end_y = pole_length * math.cos(theta)
             current_ax.plot([x, pole_end_x], [0, pole_end_y], color='crimson', linewidth=5, zorder=1)
             
-            # 4. Add telemetry text
             info_text = f"Pos: {x:.2f}m | Angle: {angle_deg:.2f}° | Action: {self._last_action if hasattr(self, '_last_action') else 0:.2f}"
             current_ax.text(-self.x_threshold + 0.1, 1.3, info_text, fontsize=10, bbox=dict(facecolor='white', alpha=0.8))
             current_ax.set_title(title)
 
-            # Only pause if the environment is managing its own window
             if ax is None:
                 plt.pause(0.001) 
         else:

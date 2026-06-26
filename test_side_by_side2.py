@@ -15,14 +15,14 @@ def main():
     
     # Instantiate THREE separate environments
     env1 = BalancingRobotEnv(render_mode="human")
-    env2 = BalancingRobotEnv(render_mode="human")
-    # env3 = BalancingRobotEnv(render_mode="human")
+    #env2 = BalancingRobotEnv(render_mode="human")
+    #env3 = BalancingRobotEnv(render_mode="human")
     
     # Load all three models
     try:
-        model_300k = PPO.load("model_300k", device="cpu")
-        model_500k = PPO.load("model_300k2", device="cpu")
-        # model_1000k = PPO.load("model_1000k", device="cpu")
+        model_300k = PPO.load("model_300k2", device="cpu")
+        #model_500k = PPO.load("model_500k2", device="cpu")
+        #model_1000k = PPO.load("model_1000k2", device="cpu")
         print("All models loaded successfully!")
     except Exception as e:
         print(f"Could not load the models. Error: {e}")
@@ -30,7 +30,7 @@ def main():
 
     # Setup the Side-by-Side Matplotlib window
     plt.ion()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 5))
+    fig, (ax1) = plt.subplots(1, 1, figsize=(18, 5))
     # fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
     fig.canvas.manager.set_window_title("Training Progress Comparison")
     plt.show(block=False)
@@ -40,7 +40,7 @@ def main():
     for angle_deg in test_angles_deg:
         print(f"\nDropping robots at {angle_deg} degrees...")
         obs1, _ = env1.reset()
-        obs2, _ = env2.reset()
+        #obs2, _ = env2.reset()
         #obs3, _ = env3.reset()
         
         # Hijack the states so they start identically
@@ -48,11 +48,11 @@ def main():
         custom_state = (0.0, 0.0, angle_rad, 0.0)
         
         env1.unwrapped.state = custom_state
-        env2.unwrapped.state = custom_state
+        #env2.unwrapped.state = custom_state
         #env3.unwrapped.state = custom_state
         
         obs1 = np.array(custom_state, dtype=np.float32)
-        obs2 = np.array(custom_state, dtype=np.float32)
+        #obs2 = np.array(custom_state, dtype=np.float32)
         #obs3 = np.array(custom_state, dtype=np.float32)
         
         done1, done2, done3 = False, False, False
@@ -66,11 +66,11 @@ def main():
                 obs1, _, term1, trunc1, _ = env1.step(action1)
                 done1 = term1 or trunc1
             
-            # Model 2 (500k) decides
-            if not done2:
-                action2, _ = model_500k.predict(obs2, deterministic=True)
-                obs2, _, term2, trunc2, _ = env2.step(action2)
-                done2 = term2 or trunc2
+            # # Model 2 (500k) decides
+            # if not done2:
+            #     action2, _ = model_500k.predict(obs2, deterministic=True)
+            #     obs2, _, term2, trunc2, _ = env2.step(action2)
+            #     done2 = term2 or trunc2
 
             # # Model 3 (1000k) decides
             # if not done3:
@@ -80,7 +80,7 @@ def main():
             
             # Render them simultaneously on their respective axes
             env1.render(ax=ax1, title="Model A (300k Steps)")
-            env2.render(ax=ax2, title="Model B (500k Steps)")
+            # env2.render(ax=ax2, title="Model B (500k Steps)")
             # env3.render(ax=ax3, title="Model C (1000k Steps)")
             
             # Update the main window once per frame
@@ -88,15 +88,15 @@ def main():
             step_count += 1
             
             # If all have fallen, move to the next test early
-            if done1 and done2 : 
-            #and done3:
+            if done1 :
+            # and done2 and done3:
                 break
                 
         time.sleep(1.5)
         
     env1.close()
-    env2.close()
-    # env3.close()
+    #env2.close()
+    #env3.close()
 
 if __name__ == "__main__":
     main()
